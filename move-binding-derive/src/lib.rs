@@ -1,15 +1,21 @@
 mod package_provider;
-use crate::package_provider::{ModuleProvider, MoveModuleProvider};
+
+use std::collections::{BTreeMap, HashMap};
+use std::str::FromStr;
+use std::sync::LazyLock;
+
+use dashmap::DashMap;
 use itertools::Itertools;
 use move_binary_format::normalized::{Enum, Function, Struct, Type};
 use move_core_types::account_address::AccountAddress;
 use move_core_types::identifier::Identifier;
 use proc_macro::TokenStream;
 use proc_macro2::Ident;
-use quote::quote;
+use quote::{quote, ToTokens};
 use serde_json::Value;
-use std::collections::{BTreeMap, HashMap};
-use std::str::FromStr;
+
+use crate::package_provider::{ModuleProvider, MoveModuleProvider};
+
 use sui_sdk_types::Address;
 use syn::parse::{Parse, ParseStream};
 use syn::{parse_macro_input, DeriveInput, ExprArray, GenericParam, Generics, LitStr, Path, Token};
@@ -173,6 +179,29 @@ pub fn move_contract(input: TokenStream) -> TokenStream {
     let module_provider = MoveModuleProvider::new(network);
     let package = module_provider.get_package(package_id);
 
+    let package_address = package
+        .module_map
+        .values()
+        .next()
+        .map(|module| module.address)
+        .expect("None package address");
+
+    for dep in &deps {
+        let dep_path_str = dep
+            .to_token_stream()
+            .to_string()
+            .split_whitespace()
+            .collect::<String>();
+
+        let dep_name = dep_path_str.split("::").last().unwrap_or_default().trim();
+
+        for mut alias_entry in PACKAGE_ALIAS_MAP.iter_mut() {
+            if *alias_entry.value() == dep_name {
+                *alias_entry.value_mut() = dep_path_str.clone();
+            }
+        }
+    }
+
     let module_tokens = package.module_map.iter().map(|(module_name, module)| {
         let module_ident = Ident::new(module_name, proc_macro2::Span::call_site());
 
@@ -212,7 +241,7 @@ pub fn move_contract(input: TokenStream) -> TokenStream {
     let version = package.version;
     let expanded = quote! {
         pub mod #package_ident{
-            #(use #deps::*;)*
+            // #(use #deps;)*
             use std::str::FromStr;
             use move_binding_derive::{Key, MoveStruct};
             use move_types::{MoveType, Address, Identifier, TypeTag, StructTag};
@@ -221,7 +250,26 @@ pub fn move_contract(input: TokenStream) -> TokenStream {
             #(#module_tokens)*
         }
     };
+
+    // Defer registering the current package in the alias map until after its Rust bindings are fully generated.
+    //
+    // Registering it too early would cause submodules or dependencies to incorrectly resolve to the current
+    // (still incomplete) package path. For example, code might expand to `crate::current_package::submodule`
+    // before `submodule` actually exists, leading to Rust compilation errors like:
+    // "failed to resolve: use of unresolved module or unlinked crate".
+    register_alias_mapping(package_address.into(), &package_alias);
     expanded.into()
+}
+
+static PACKAGE_ALIAS_MAP: LazyLock<DashMap<AccountAddress, String>> =
+    LazyLock::new(|| DashMap::new());
+
+fn register_alias_mapping(address: AccountAddress, alias: &str) {
+    PACKAGE_ALIAS_MAP.insert(address, alias.to_string());
+}
+
+fn get_alias_for_address(address: &AccountAddress) -> Option<String> {
+    PACKAGE_ALIAS_MAP.get(address).map(|r| r.value().clone())
 }
 
 fn resolve_mvr_name(package: String, url: &str) -> Option<Address> {
@@ -580,14 +628,22 @@ impl ToRustType for Type {
                 (&AccountAddress::TWO, "object", "UID") => "sui_sdk_types::ObjectId".to_string(),
                 (&AccountAddress::TWO, "object", "ID") => "sui_sdk_types::ObjectId".to_string(),
                 _ => {
-                    if type_arguments.is_empty() {
-                        format!("{module}::{name}")
+                    let base_path = if let Some(alias) = get_alias_for_address(address) {
+                        format!("{alias}::{module}")
+                    } else {
+                        module.to_string()
+                    };
+
+                    let type_args = if type_arguments.is_empty() {
+                        String::new()
                     } else {
                         format!(
-                            "{module}::{name}<{}>",
+                            "<{}>",
                             type_arguments.iter().map(|ty| ty.to_rust_type()).join(", ")
                         )
-                    }
+                    };
+
+                    format!("{base_path}::{name}{type_args}")
                 }
             }
         } else {
