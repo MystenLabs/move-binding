@@ -8,6 +8,6 @@ edition = "2021"
 
 [dependencies]
 serde.workspace = true
-sui-sdk-types = { git = "https://github.com/mystenlabs/sui-rust-sdk", features = ["serde"], rev="86a9e06" }
-sui-transaction-builder = { git = "https://github.com/mystenlabs/sui-rust-sdk", rev="86a9e06" }
+sui-sdk-types = { git = "https://github.com/mystenlabs/sui-rust-sdk", features = ["serde"], rev="f0c8068" }
+sui-transaction-builder = { git = "https://github.com/mystenlabs/sui-rust-sdk", rev="f0c8068" }
 move-core-types = { git = "https://github.com/MystenLabs/sui.git", rev = "42ba6c0" }

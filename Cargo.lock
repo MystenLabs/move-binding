@@ -1552,6 +1552,15 @@ dependencies = [
 
 [[package]]
 name = "itertools"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
@@ -1750,7 +1759,7 @@ dependencies = [
  "quote",
  "reqwest",
  "serde_json",
- "sui-sdk-types",
+ "sui-sdk-types 0.0.2",
  "syn 2.0.98",
 ]
 
@@ -1765,8 +1774,8 @@ dependencies = [
  "quote",
  "serde",
  "sui-graphql-client",
- "sui-sdk-types",
- "sui-transaction-builder",
+ "sui-sdk-types 0.0.2",
+ "sui-transaction-builder 0.1.0",
  "syn 2.0.98",
  "tokio",
 ]
@@ -1811,8 +1820,8 @@ version = "0.1.0"
 dependencies = [
  "move-core-types",
  "serde",
- "sui-sdk-types",
- "sui-transaction-builder",
+ "sui-sdk-types 0.0.5",
+ "sui-transaction-builder 0.0.5",
 ]
 
 [[package]]
@@ -2967,7 +2976,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sui-graphql-client-build",
- "sui-sdk-types",
+ "sui-sdk-types 0.0.2",
  "tokio",
  "tracing",
  "url",
@@ -3001,6 +3010,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "sui-sdk-types"
+version = "0.0.5"
+source = "git+https://github.com/mystenlabs/sui-rust-sdk?rev=f0c8068#f0c8068f83475a14e10da5a27516e8ac8ac935b2"
+dependencies = [
+ "base64ct",
+ "bcs",
+ "blake2",
+ "bnum",
+ "bs58 0.5.1",
+ "hex",
+ "itertools 0.13.0",
+ "roaring",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "serde_with",
+ "winnow 0.7.11",
+]
+
+[[package]]
+name = "sui-transaction-builder"
+version = "0.0.5"
+source = "git+https://github.com/mystenlabs/sui-rust-sdk?rev=f0c8068#f0c8068f83475a14e10da5a27516e8ac8ac935b2"
+dependencies = [
+ "base64ct",
+ "bcs",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "sui-sdk-types 0.0.5",
+ "thiserror 2.0.11",
+]
+
+[[package]]
 name = "sui-transaction-builder"
 version = "0.1.0"
 source = "git+https://github.com/mystenlabs/sui-rust-sdk?rev=86a9e06#86a9e06cde84671e96e776d926a85fc1f229314d"
@@ -3010,7 +3053,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
- "sui-sdk-types",
+ "sui-sdk-types 0.0.2",
  "thiserror 2.0.11",
 ]
 
@@ -3754,6 +3797,15 @@ name = "winnow"
 version = "0.6.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e90edd2ac1aa278a5c4599b1d89cf03074b610800f866d4026dc199d7929a28"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
+name = "winnow"
+version = "0.7.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "74c7b26e3480b707944fc872477815d29a8e429d2f93a1ce000f5fa84a15cbcd"
 dependencies = [
  "memchr",
 ]
