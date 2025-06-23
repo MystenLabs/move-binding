@@ -148,5 +148,12 @@ pub fn move_contract(input: TokenStream) -> TokenStream {
         package,
         path,
     } = parse_macro_input!(input as MoveContractArgs);
-    MoveCodegen::expand(network, &package, &package_alias, &path.unwrap_or("crate".to_string())).unwrap().into()
+    MoveCodegen::expand(
+        network,
+        &package,
+        &package_alias,
+        &path.unwrap_or("crate".to_string()),
+    )
+    .unwrap()
+    .into()
 }

@@ -7,7 +7,6 @@ pub trait ToRustType {
     fn to_rust_type(&self) -> String;
     fn is_ref(&self) -> bool;
     fn to_arg_type(&self) -> String;
-    fn try_resolve_known_types(&self) -> String;
 }
 
 impl ToRustType for Type {
@@ -22,7 +21,7 @@ impl ToRustType for Type {
             Self::U256 => "move_types::U256".to_string(),
             Self::Address => "Address".to_string(),
             Self::Signer => "Address".to_string(),
-            t @ Self::Struct { .. } => t.try_resolve_known_types(),
+            t @ Self::Struct { .. } => try_resolve_known_types(t),
             Self::Vector(t) => {
                 format!("Vec<{}>", t.to_rust_type())
             }
@@ -54,44 +53,49 @@ impl ToRustType for Type {
             _ => format!("Arg<{}>", self.to_rust_type()),
         }
     }
+}
 
-    fn try_resolve_known_types(&self) -> String {
-        if let Self::Struct {
-            address,
-            module,
-            name,
-            type_arguments,
-        } = self
-        {
-            match (address, module.as_str(), name.as_str()) {
-                (&AccountAddress::ONE, "type_name", "TypeName") => "String".to_string(),
-                (&AccountAddress::ONE, "string", "String") => "String".to_string(),
-                (&AccountAddress::ONE, "ascii", "String") => "String".to_string(),
-                (&AccountAddress::ONE, "option", "Option") => {
-                    format!("Option<{}>", type_arguments[0].to_rust_type())
-                }
+fn try_resolve_known_types(_type: &Type) -> String {
+    if let Type::Struct {
+        address,
+        module,
+        name,
+        type_arguments,
+    } = _type
+    {
+        match (address, module.as_str(), name.as_str()) {
+            (&AccountAddress::ONE, "type_name", "TypeName") => "String".to_string(),
+            (&AccountAddress::ONE, "string", "String") => "String".to_string(),
+            (&AccountAddress::ONE, "ascii", "String") => "String".to_string(),
+            (&AccountAddress::ONE, "option", "Option") => {
+                format!("Option<{}>", type_arguments[0].to_rust_type())
+            }
 
-                (&AccountAddress::TWO, "object", "UID") => "ObjectId".to_string(),
-                (&AccountAddress::TWO, "object", "ID") => "ObjectId".to_string(),
-                _ => {
-                    let cache = BINDING_REGISTRY.read().unwrap();
-                    let package_path = cache.get(address).cloned().expect(&format!("failed to resolve: use of undeclared package `{address}`"));
-                    drop(cache); // Release read lock
+            (&AccountAddress::TWO, "object", "UID") => "ObjectId".to_string(),
+            (&AccountAddress::TWO, "object", "ID") => "ObjectId".to_string(),
+            _ => {
+                let cache = BINDING_REGISTRY.read().unwrap();
 
-                    let type_ = format!("{package_path}::{module}::{name}");
+                let package_path =  cache.get(address).cloned();
+                drop(cache); // Release read lock
 
-                    if type_arguments.is_empty() {
-                        type_
-                    } else {
-                        format!(
-                            "{type_}<{}>",
-                            type_arguments.iter().map(|ty| ty.to_rust_type()).join(", ")
-                        )
-                    }
+                let type_ = if let Some(package_path) = package_path{
+                    format!("{package_path}::{module}::{name}")
+                }else{
+                    format!("{module}::{name}")
+                };
+
+                if type_arguments.is_empty() {
+                    type_
+                } else {
+                    format!(
+                        "{type_}<{}>",
+                        type_arguments.iter().map(|ty| ty.to_rust_type()).join(", ")
+                    )
                 }
             }
-        } else {
-            unreachable!()
         }
+    } else {
+        unreachable!()
     }
 }

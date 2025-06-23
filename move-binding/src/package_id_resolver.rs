@@ -1,13 +1,15 @@
+use crate::SuiNetwork;
 use serde_json::Value;
 use std::str::FromStr;
 use sui_sdk_types::Address;
-use crate::SuiNetwork;
 
 pub struct PackageIdResolver;
 
-
 impl PackageIdResolver {
-    pub fn resolve_package_id(network: SuiNetwork, package: &str) -> Result<Address, anyhow::Error> {
+    pub fn resolve_package_id(
+        network: SuiNetwork,
+        package: &str,
+    ) -> Result<Address, anyhow::Error> {
         Ok(if package.contains("@") || package.contains(".sui") {
             Self::resolve_mvr_name(package, network.mvr_endpoint())?
         } else {
@@ -20,9 +22,8 @@ impl PackageIdResolver {
         let name = client
             .get(format!("{url}/v1/resolution/{package}"))
             .send()?;
-        Ok(serde_json::from_value(name.json::<Value>()?["package_id"].clone())?)
+        Ok(serde_json::from_value(
+            name.json::<Value>()?["package_id"].clone(),
+        )?)
     }
 }
-
-
-

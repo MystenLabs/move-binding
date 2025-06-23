@@ -1,6 +1,7 @@
 use crate::package_provider::{ModuleProvider, MoveModuleProvider};
 use crate::types::ToRustType;
 use crate::SuiNetwork;
+use anyhow::anyhow;
 use itertools::Itertools;
 use move_binary_format::normalized::{Enum, Function, Struct, Type};
 use move_core_types::account_address::AccountAddress;
@@ -11,51 +12,69 @@ use quote::quote;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::RwLock;
 
-pub static BINDING_REGISTRY: Lazy<RwLock<HashMap<AccountAddress, String>>> = Lazy::new(|| RwLock::new(HashMap::new()));
+pub static BINDING_REGISTRY: Lazy<RwLock<HashMap<AccountAddress, String>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
 
 pub struct MoveCodegen;
 
 impl MoveCodegen {
-    pub fn expand(network: SuiNetwork, package: &str, package_alias: &str, base_path: &str) -> Result<TokenStream, anyhow::Error> {
+    pub fn expand(
+        network: SuiNetwork,
+        package: &str,
+        package_alias: &str,
+        base_path: &str,
+    ) -> Result<TokenStream, anyhow::Error> {
         let module_provider = MoveModuleProvider::new(network);
         let package = module_provider.get_package(package)?;
 
         // register package path
-        let mut cache = BINDING_REGISTRY.write().unwrap();
-        package.type_origin_table.iter().flat_map(|(_, m)| m.values()).dedup().for_each(|addr| {
-            cache.insert(addr.clone(), format!("{base_path}::{package_alias}"));
-        });
+        let mut cache = BINDING_REGISTRY
+            .write()
+            .map_err(|e| anyhow!("Failed to acquire write lock: {}", e))?;
+        package
+            .type_origin_table
+            .iter()
+            .flat_map(|(_, m)| m.values())
+            .dedup()
+            .for_each(|addr| {
+                cache.insert(addr.clone(), format!("{base_path}::{package_alias}"));
+            });
         drop(cache);
 
-        let module_tokens = package.module_map.iter().map(|(module_name, module)| {
-            let module_ident = Ident::new(module_name, proc_macro2::Span::call_site());
-            let type_origin_table = package
-                .type_origin_table
-                .get(module_name)
-                .cloned()
-                .unwrap_or_default();
+        let module_tokens = package
+            .module_map
+            .iter()
+            .map(|(module_name, module)| {
+                let module_ident = Ident::new(module_name, proc_macro2::Span::call_site());
+                let type_origin_table = package
+                    .type_origin_table
+                    .get(module_name)
+                    .cloned()
+                    .unwrap_or_default();
 
-            let mut struct_fun_tokens = Self::create_structs(&module.structs, &type_origin_table)?;
-            struct_fun_tokens.extend(Self::create_enums(&module.enums, &type_origin_table));
-            struct_fun_tokens.extend(Self::create_funs(&module.functions));
+                let mut struct_fun_tokens =
+                    Self::create_structs(&module.structs, &type_origin_table)?;
+                struct_fun_tokens.extend(Self::create_enums(&module.enums, &type_origin_table));
+                struct_fun_tokens.extend(Self::create_funs(&module.functions));
 
-            Ok::<_, anyhow::Error>(if struct_fun_tokens.is_empty() {
-                quote! {}
-            } else {
-                let addr_byte_ident = module.address.to_vec();
-                quote! {
-                    pub mod #module_ident{
-                        use std::str::FromStr;
-                        use move_binding_derive::{MoveStruct, Key};
-                        use move_types::{MoveType, Address, Identifier, ObjectId};
-                        use move_types::functions::{Arg, Ref, MutRef};
-                        pub const PACKAGE_ID: Address = Address::new([#(#addr_byte_ident),*]);
-                        pub const MODULE_NAME: &str = #module_name;
-                        #(#struct_fun_tokens)*
+                Ok::<_, anyhow::Error>(if struct_fun_tokens.is_empty() {
+                    quote! {}
+                } else {
+                    let addr_byte_ident = module.address.to_vec();
+                    quote! {
+                        pub mod #module_ident{
+                            use std::str::FromStr;
+                            use move_binding_derive::{MoveStruct, Key};
+                            use move_types::{MoveType, Address, Identifier, ObjectId};
+                            use move_types::functions::{Arg, Ref, MutRef};
+                            pub const PACKAGE_ID: Address = Address::new([#(#addr_byte_ident),*]);
+                            pub const MODULE_NAME: &str = #module_name;
+                            #(#struct_fun_tokens)*
+                        }
                     }
-                }
+                })
             })
-        }).collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()?;
 
         let package_ident = Ident::new(&package_alias, proc_macro2::Span::call_site());
         let version = package.version;
@@ -74,7 +93,9 @@ impl MoveCodegen {
     ) -> Result<Vec<TokenStream>, anyhow::Error> {
         structs
             .iter()
-            .map(|(name, move_struct)| Self::create_struct(name.as_str(), move_struct, type_origin_ids))
+            .map(|(name, move_struct)| {
+                Self::create_struct(name.as_str(), move_struct, type_origin_ids)
+            })
             .collect()
     }
 
@@ -90,7 +111,8 @@ impl MoveCodegen {
                 type_parameters.push(quote! {#ident});
 
                 if v.is_phantom {
-                    let name = Ident::new(&format!("phantom_data_{i}"), proc_macro2::Span::call_site());
+                    let name =
+                        Ident::new(&format!("phantom_data_{i}"), proc_macro2::Span::call_site());
                     let type_: syn::Type =
                         syn::parse_str(&format!("std::marker::PhantomData<T{i}>")).unwrap();
                     phantoms.push(quote! {#name: #type_,})
@@ -100,14 +122,18 @@ impl MoveCodegen {
         );
 
         let struct_ident = Ident::new(&struct_name.to_string(), proc_macro2::Span::call_site());
-        let field_tokens = move_struct.fields.iter().map(|field| {
-            let field_ident = Ident::new(
-                &escape_keyword(field.name.as_str()),
-                proc_macro2::Span::call_site(),
-            );
-            let field_type: syn::Type = syn::parse_str(&field.type_.to_rust_type())?;
-            Ok(quote! {pub #field_ident: #field_type,})
-        }).collect::<Result<Vec<_>, anyhow::Error>>()?;
+        let field_tokens = move_struct
+            .fields
+            .iter()
+            .map(|field| {
+                let field_ident = Ident::new(
+                    &escape_keyword(field.name.as_str()),
+                    proc_macro2::Span::call_site(),
+                );
+                let field_type: syn::Type = syn::parse_str(&field.type_.to_rust_type())?;
+                Ok(quote! {pub #field_ident: #field_type,})
+            })
+            .collect::<Result<Vec<_>, anyhow::Error>>()?;
 
         let mut derives = vec![
             quote! {serde::Deserialize},
@@ -178,13 +204,14 @@ impl MoveCodegen {
                 .all(|(i, field)| field.name.to_string() == format!("pos{}", i))
             {
                 let field_types = variant.fields.iter().map(|field| {
-                    let field_type: syn::Type = syn::parse_str(&field.type_.to_rust_type()).unwrap();
+                    let field_type: syn::Type =
+                        syn::parse_str(&field.type_.to_rust_type()).unwrap();
                     quote! {#field_type,}
                 });
 
                 return quote! {
-                #variant_ident(#(#field_types)*),
-            };
+                    #variant_ident(#(#field_types)*),
+                };
             }
 
             let field_tokens = variant.fields.iter().map(|field| {
@@ -208,15 +235,15 @@ impl MoveCodegen {
         let addr_byte_ident = type_origin_id[enum_name].to_vec();
 
         quote! {
-        #[derive(#(#derives),*)]
-        pub enum #enum_ident{
-            #(#variant_tokens)*
-        }
+            #[derive(#(#derives),*)]
+            pub enum #enum_ident{
+                #(#variant_tokens)*
+            }
 
-        impl #enum_ident{
-            pub const TYPE_ORIGIN_ID: Address = Address::new([#(#addr_byte_ident),*]);
+            impl #enum_ident{
+                pub const TYPE_ORIGIN_ID: Address = Address::new([#(#addr_byte_ident),*]);
+            }
         }
-    }
     }
 
     fn create_funs(funs: &BTreeMap<Identifier, Function>) -> Vec<TokenStream> {
@@ -288,29 +315,29 @@ impl MoveCodegen {
 
         let sig = if types_with_ability.is_empty() {
             quote! {
-            pub fn #fun_ident(#(#params),*) #maybe_returns
-        }
+                pub fn #fun_ident(#(#params),*) #maybe_returns
+            }
         } else {
             quote! {
-            pub fn #fun_ident <#(#types_with_ability),*>(#(#params),*) #maybe_returns
-        }
+                pub fn #fun_ident <#(#types_with_ability),*>(#(#params),*) #maybe_returns
+            }
         };
 
         let fun_impl = quote! {
-        #sig {
-            #(let #param_names = #param_names.resolve_arg(builder);)*
-            builder.move_call(
-                sui_transaction_builder::Function::new(
-                    PACKAGE_ID,
-                    Identifier::from_str(MODULE_NAME).unwrap(),
-                    Identifier::from_str(#fun_name).unwrap(),
-                    vec![#(#types::type_()),*],
-                ),
-                vec![#(#param_names.into()),*],
-            )
-            #maybe_into
-        }
-    };
+            #sig {
+                #(let #param_names = #param_names.resolve_arg(builder);)*
+                builder.move_call(
+                    sui_transaction_builder::Function::new(
+                        PACKAGE_ID,
+                        Identifier::from_str(MODULE_NAME).unwrap(),
+                        Identifier::from_str(#fun_name).unwrap(),
+                        vec![#(#types::type_()),*],
+                    ),
+                    vec![#(#param_names.into()),*],
+                )
+                #maybe_into
+            }
+        };
         Some(fun_impl)
     }
 }

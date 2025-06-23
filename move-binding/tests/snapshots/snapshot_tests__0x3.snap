@@ -3,7 +3,7 @@ source: move-binding/tests/snapshot_tests.rs
 expression: pretty
 ---
 pub mod sui_system {
-    pub const PACKAGE_VERSION: u64 = 20u64;
+    pub const PACKAGE_VERSION: u64 = 22u64;
     pub mod genesis {
         use std::str::FromStr;
         use move_binding_derive::{MoveStruct, Key};
@@ -349,6 +349,23 @@ pub mod sui_system {
                     ),
                     vec![p0.into(), p1.into()],
                 );
+        }
+        pub fn activation_epoch<'a>(
+            builder: &mut sui_transaction_builder::TransactionBuilder,
+            p0: Ref<'a, crate::sui_system::staking_pool::StakingPool>,
+        ) -> Arg<Option<u64>> {
+            let p0 = p0.resolve_arg(builder);
+            builder
+                .move_call(
+                    sui_transaction_builder::Function::new(
+                        PACKAGE_ID,
+                        Identifier::from_str(MODULE_NAME).unwrap(),
+                        Identifier::from_str("activation_epoch").unwrap(),
+                        vec![],
+                    ),
+                    vec![p0.into()],
+                )
+                .into()
         }
         pub fn calculate_fungible_staked_sui_withdraw_amount(
             builder: &mut sui_transaction_builder::TransactionBuilder,
@@ -3923,44 +3940,6 @@ pub mod sui_system {
                 )
                 .into()
         }
-        pub fn is_equal_some<'a, T0: MoveType>(
-            builder: &mut sui_transaction_builder::TransactionBuilder,
-            p0: Ref<'a, Option<T0>>,
-            p1: Ref<'a, Option<T0>>,
-        ) -> Arg<bool> {
-            let p0 = p0.resolve_arg(builder);
-            let p1 = p1.resolve_arg(builder);
-            builder
-                .move_call(
-                    sui_transaction_builder::Function::new(
-                        PACKAGE_ID,
-                        Identifier::from_str(MODULE_NAME).unwrap(),
-                        Identifier::from_str("is_equal_some").unwrap(),
-                        vec![T0::type_()],
-                    ),
-                    vec![p0.into(), p1.into()],
-                )
-                .into()
-        }
-        pub fn is_equal_some_and_value<'a, T0: MoveType>(
-            builder: &mut sui_transaction_builder::TransactionBuilder,
-            p0: Ref<'a, Option<T0>>,
-            p1: Ref<'a, T0>,
-        ) -> Arg<bool> {
-            let p0 = p0.resolve_arg(builder);
-            let p1 = p1.resolve_arg(builder);
-            builder
-                .move_call(
-                    sui_transaction_builder::Function::new(
-                        PACKAGE_ID,
-                        Identifier::from_str(MODULE_NAME).unwrap(),
-                        Identifier::from_str("is_equal_some_and_value").unwrap(),
-                        vec![T0::type_()],
-                    ),
-                    vec![p0.into(), p1.into()],
-                )
-                .into()
-        }
         pub fn is_preactive<'a>(
             builder: &mut sui_transaction_builder::TransactionBuilder,
             p0: Ref<'a, crate::sui_system::validator::Validator>,
@@ -5221,7 +5200,7 @@ pub mod sui_system {
                 0u8, 0u8, 0u8, 3u8,
             ]);
         }
-        pub fn new_from_unverified<'a>(
+        pub fn into_verified<'a>(
             builder: &mut sui_transaction_builder::TransactionBuilder,
             p0: Ref<
                 'a,
@@ -5234,7 +5213,7 @@ pub mod sui_system {
                     sui_transaction_builder::Function::new(
                         PACKAGE_ID,
                         Identifier::from_str(MODULE_NAME).unwrap(),
-                        Identifier::from_str("new_from_unverified").unwrap(),
+                        Identifier::from_str("into_verified").unwrap(),
                         vec![],
                     ),
                     vec![p0.into()],

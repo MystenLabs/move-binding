@@ -3,7 +3,7 @@ source: move-binding/tests/snapshot_tests.rs
 expression: pretty
 ---
 pub mod sui {
-    pub const PACKAGE_VERSION: u64 = 33u64;
+    pub const PACKAGE_VERSION: u64 = 35u64;
     pub mod address {
         use std::str::FromStr;
         use move_binding_derive::{MoveStruct, Key};
@@ -9505,6 +9505,130 @@ pub mod sui {
                 .into()
         }
     }
+    pub mod party {
+        use std::str::FromStr;
+        use move_binding_derive::{MoveStruct, Key};
+        use move_types::{MoveType, Address, Identifier, ObjectId};
+        use move_types::functions::{Arg, Ref, MutRef};
+        pub const PACKAGE_ID: Address = Address::new([
+            0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,
+            0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,
+            0u8, 2u8,
+        ]);
+        pub const MODULE_NAME: &str = "party";
+        #[derive(serde::Deserialize, serde::Serialize, Debug, MoveStruct)]
+        pub struct Party {
+            pub default: crate::sui::party::Permissions,
+            pub members: crate::sui::vec_map::VecMap<
+                Address,
+                crate::sui::party::Permissions,
+            >,
+        }
+        impl Party {
+            pub const TYPE_ORIGIN_ID: Address = Address::new([
+                0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,
+                0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,
+                0u8, 0u8, 0u8, 2u8,
+            ]);
+        }
+        #[derive(serde::Deserialize, serde::Serialize, Debug, MoveStruct)]
+        pub struct Permissions {
+            pub pos0: u64,
+        }
+        impl Permissions {
+            pub const TYPE_ORIGIN_ID: Address = Address::new([
+                0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,
+                0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,
+                0u8, 0u8, 0u8, 2u8,
+            ]);
+        }
+        pub fn empty(
+            builder: &mut sui_transaction_builder::TransactionBuilder,
+        ) -> Arg<crate::sui::party::Party> {
+            builder
+                .move_call(
+                    sui_transaction_builder::Function::new(
+                        PACKAGE_ID,
+                        Identifier::from_str(MODULE_NAME).unwrap(),
+                        Identifier::from_str("empty").unwrap(),
+                        vec![],
+                    ),
+                    vec![],
+                )
+                .into()
+        }
+        pub fn into_native(
+            builder: &mut sui_transaction_builder::TransactionBuilder,
+            p0: Arg<crate::sui::party::Party>,
+        ) -> Arg<u64> {
+            let p0 = p0.resolve_arg(builder);
+            builder
+                .move_call(
+                    sui_transaction_builder::Function::new(
+                        PACKAGE_ID,
+                        Identifier::from_str(MODULE_NAME).unwrap(),
+                        Identifier::from_str("into_native").unwrap(),
+                        vec![],
+                    ),
+                    vec![p0.into()],
+                )
+                .into()
+        }
+        pub fn is_single_owner<'a>(
+            builder: &mut sui_transaction_builder::TransactionBuilder,
+            p0: Ref<'a, crate::sui::party::Party>,
+        ) -> Arg<bool> {
+            let p0 = p0.resolve_arg(builder);
+            builder
+                .move_call(
+                    sui_transaction_builder::Function::new(
+                        PACKAGE_ID,
+                        Identifier::from_str(MODULE_NAME).unwrap(),
+                        Identifier::from_str("is_single_owner").unwrap(),
+                        vec![],
+                    ),
+                    vec![p0.into()],
+                )
+                .into()
+        }
+        pub fn set_permissions<'a>(
+            builder: &mut sui_transaction_builder::TransactionBuilder,
+            p0: MutRef<'a, crate::sui::party::Party>,
+            p1: Arg<Address>,
+            p2: Arg<crate::sui::party::Permissions>,
+        ) {
+            let p0 = p0.resolve_arg(builder);
+            let p1 = p1.resolve_arg(builder);
+            let p2 = p2.resolve_arg(builder);
+            builder
+                .move_call(
+                    sui_transaction_builder::Function::new(
+                        PACKAGE_ID,
+                        Identifier::from_str(MODULE_NAME).unwrap(),
+                        Identifier::from_str("set_permissions").unwrap(),
+                        vec![],
+                    ),
+                    vec![p0.into(), p1.into(), p2.into()],
+                );
+        }
+        pub fn single_owner(
+            builder: &mut sui_transaction_builder::TransactionBuilder,
+            p0: Arg<Address>,
+        ) -> Arg<crate::sui::party::Party> {
+            let p0 = p0.resolve_arg(builder);
+            builder
+                .move_call(
+                    sui_transaction_builder::Function::new(
+                        PACKAGE_ID,
+                        Identifier::from_str(MODULE_NAME).unwrap(),
+                        Identifier::from_str("single_owner").unwrap(),
+                        vec![],
+                    ),
+                    vec![p0.into()],
+                )
+                .into()
+        }
+    }
     pub mod pay {
         use std::str::FromStr;
         use move_binding_derive::{MoveStruct, Key};
@@ -11751,6 +11875,46 @@ pub mod sui {
                     vec![p0.into()],
                 );
         }
+        pub fn party_transfer<T0: move_types::Key>(
+            builder: &mut sui_transaction_builder::TransactionBuilder,
+            p0: Arg<T0>,
+            p1: Arg<crate::sui::party::Party>,
+        ) {
+            let p0 = p0.resolve_arg(builder);
+            let p1 = p1.resolve_arg(builder);
+            builder
+                .move_call(
+                    sui_transaction_builder::Function::new(
+                        PACKAGE_ID,
+                        Identifier::from_str(MODULE_NAME).unwrap(),
+                        Identifier::from_str("party_transfer").unwrap(),
+                        vec![T0::type_()],
+                    ),
+                    vec![p0.into(), p1.into()],
+                );
+        }
+        pub fn party_transfer_impl<T0: move_types::Key>(
+            builder: &mut sui_transaction_builder::TransactionBuilder,
+            p0: Arg<T0>,
+            p1: Arg<u64>,
+            p2: Arg<Vec<Address>>,
+            p3: Arg<Vec<u64>>,
+        ) {
+            let p0 = p0.resolve_arg(builder);
+            let p1 = p1.resolve_arg(builder);
+            let p2 = p2.resolve_arg(builder);
+            let p3 = p3.resolve_arg(builder);
+            builder
+                .move_call(
+                    sui_transaction_builder::Function::new(
+                        PACKAGE_ID,
+                        Identifier::from_str(MODULE_NAME).unwrap(),
+                        Identifier::from_str("party_transfer_impl").unwrap(),
+                        vec![T0::type_()],
+                    ),
+                    vec![p0.into(), p1.into(), p2.into(), p3.into()],
+                );
+        }
         pub fn public_freeze_object<T0: move_types::Key>(
             builder: &mut sui_transaction_builder::TransactionBuilder,
             p0: Arg<T0>,
@@ -11765,6 +11929,24 @@ pub mod sui {
                         vec![T0::type_()],
                     ),
                     vec![p0.into()],
+                );
+        }
+        pub fn public_party_transfer<T0: move_types::Key>(
+            builder: &mut sui_transaction_builder::TransactionBuilder,
+            p0: Arg<T0>,
+            p1: Arg<crate::sui::party::Party>,
+        ) {
+            let p0 = p0.resolve_arg(builder);
+            let p1 = p1.resolve_arg(builder);
+            builder
+                .move_call(
+                    sui_transaction_builder::Function::new(
+                        PACKAGE_ID,
+                        Identifier::from_str(MODULE_NAME).unwrap(),
+                        Identifier::from_str("public_party_transfer").unwrap(),
+                        vec![T0::type_()],
+                    ),
+                    vec![p0.into(), p1.into()],
                 );
         }
         pub fn public_receive<'a, T0: move_types::Key>(
